@@ -1,0 +1,764 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>RotaFácil V4 • Operacional</title>
+  <!-- Tesseract.js para leitura OCR de etiquetas -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  <style>
+    :root {
+      --primary: #0d47a1;
+      --primary-light: #1976d2;
+      --success: #2e7d32;
+      --warning: #ef6c00;
+      --danger: #c62828;
+      --waze: #33ccff;
+      --bg: #f4f6f9;
+      --card: #ffffff;
+      --text: #1a1f36;
+      --muted: #5e6c84;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { background: var(--bg); color: var(--text); max-width: 480px; margin: 0 auto; min-height: 100vh; padding-bottom: 90px; }
+
+    header { background: var(--primary); color: #fff; padding: 14px 16px; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; z-index: 20; }
+    header h1 { font-size: 18px; font-weight: 700; }
+    .header-actions { display: flex; gap: 6px; }
+    .btn-header { background: rgba(255,255,255,0.2); border: none; color: #fff; padding: 7px 10px; border-radius: 8px; font-weight: 600; cursor: pointer; font-size: 11px; }
+
+    .kpi-bar { background: var(--card); padding: 12px; border-bottom: 1px solid #e0e6ed; }
+    .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); text-align: center; gap: 6px; }
+    .kpi-val { font-size: 20px; font-weight: 800; }
+    .kpi-lbl { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+    .kpi-sub { margin-top: 10px; padding-top: 8px; border-top: 1px solid #f0f2f5; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; color: var(--muted); }
+
+    .view { display: none; padding: 14px; }
+    .view.active { display: block; }
+
+    /* Card Próxima Entrega */
+    .next-card { background: var(--card); border-radius: 16px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,0.08); margin-bottom: 16px; border-left: 6px solid var(--primary); }
+    .badge-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+    .badge-stop { background: var(--primary); color: #fff; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
+    .dist-info { font-size: 13px; font-weight: 700; color: var(--muted); }
+    .client-name { font-size: 15px; font-weight: 600; color: var(--muted); }
+    .address-main { font-size: 21px; font-weight: 800; margin: 4px 0; line-height: 1.25; }
+    .address-sub { font-size: 14px; color: var(--muted); margin-bottom: 8px; }
+    .alert-geo { background: #fff3e0; color: #e65100; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 600; margin-bottom: 12px; }
+
+    /* Botões */
+    .nav-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+    .btn { border: none; border-radius: 10px; padding: 14px; font-weight: 800; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; text-decoration: none; }
+    .btn:active { transform: scale(0.98); }
+    .btn-waze { background: var(--waze); color: #000; }
+    .btn-maps { background: var(--primary-light); color: #fff; }
+    .btn-done { background: var(--success); color: #fff; width: 100%; font-size: 16px; padding: 16px; margin-bottom: 10px; }
+    .btn-photo { background: #1e293b; color: #fff; width: 100%; font-size: 14px; padding: 13px; margin-bottom: 10px; }
+    .sec-grid { display: grid; grid-template-columns: 1.4fr 1fr; gap: 8px; }
+    .btn-skip { background: #fff; border: 1.5px solid #cbd5e1; color: var(--text); font-size: 12px; padding: 11px; }
+    .btn-prob { background: #ffebee; border: 1.5px solid #ffcdd2; color: var(--danger); font-size: 12px; padding: 11px; }
+
+    /* Lista da Rota & Botão Excluir */
+    .section-header { display: flex; justify-content: space-between; align-items: center; margin: 14px 0 8px; }
+    .section-title { font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; }
+    .btn-clear-all { background: #ffebee; color: var(--danger); border: 1px solid #ffcdd2; padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 700; cursor: pointer; }
+
+    .stop-item { background: var(--card); border-radius: 10px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); }
+    .stop-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 12px; flex-shrink: 0; }
+    .st-pendente .stop-num { background: #fff3e0; color: var(--warning); }
+    .st-concluida .stop-num { background: #e8f5e9; color: var(--success); }
+    .st-problema .stop-num, .st-pulada .stop-num { background: #ffebee; color: var(--danger); }
+    .st-concluida .stop-addr { text-decoration: line-through; color: var(--muted); }
+    .stop-info { flex: 1; min-width: 0; }
+    .stop-addr { font-weight: 700; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-meta { font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .btn-del { background: #fff1f2; border: 1px solid #fecdd3; color: #be123c; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px; cursor: pointer; }
+    .btn-del:active { background: #ffe4e6; transform: scale(0.94); }
+
+    /* Scanner & Câmera */
+    .scanner-card { background: var(--card); border-radius: 14px; padding: 14px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 12px; }
+    .camera-box { position: relative; width: 100%; height: 220px; background: #111827; border-radius: 12px; overflow: hidden; margin-bottom: 10px; display: none; }
+    .camera-box.active { display: block; }
+    video { width: 100%; height: 100%; object-fit: cover; }
+    .scan-frame { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 84%; height: 120px; border: 3px solid #00e676; border-radius: 12px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.45); pointer-events: none; }
+    .preview-img { width: 100%; max-height: 180px; object-fit: contain; border-radius: 10px; margin-bottom: 10px; display: none; background: #000; }
+
+    .status-banner { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e3a8a; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: 600; text-align: center; margin-bottom: 10px; }
+
+    /* Card de Confirmação do OCR */
+    .confirm-box { background: #f0fdf4; border: 2px solid #22c55e; border-radius: 12px; padding: 14px; margin-bottom: 12px; display: none; }
+    .confirm-box.active { display: block; }
+    .confirm-title { font-size: 13px; font-weight: 800; color: #15803d; margin-bottom: 8px; text-transform: uppercase; }
+    .confirm-btns { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; }
+
+    .manual-box { background: var(--card); padding: 14px; border-radius: 12px; margin-top: 10px; }
+    .input-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+    input { width: 100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 14px; }
+
+    .bottom-nav { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--card); border-top: 1px solid #e0e6ed; display: grid; grid-template-columns: 1fr 1fr; padding: 8px; gap: 8px; z-index: 30; }
+    .tab-btn { border: none; background: transparent; padding: 12px; border-radius: 10px; font-weight: 700; font-size: 14px; color: var(--muted); cursor: pointer; }
+    .tab-btn.active { background: #e3f2fd; color: var(--primary); }
+
+    /* Modal Ocorrência & Toast */
+    .modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 50; align-items: flex-end; justify-content: center; }
+    .modal-bg.open { display: flex; }
+    .modal-sheet { background: #fff; width: 100%; max-width: 480px; border-radius: 20px 20px 0 0; padding: 20px; }
+    .modal-sheet h3 { margin-bottom: 14px; text-align: center; }
+    .occ-btn { width: 100%; padding: 14px; margin-bottom: 8px; border: none; border-radius: 10px; background: #ffebee; color: var(--danger); font-weight: 700; font-size: 14px; cursor: pointer; }
+
+    .toast { position: fixed; top: 70px; left: 50%; transform: translateX(-50%); background: #1a1f36; color: #fff; padding: 10px 18px; border-radius: 20px; font-size: 13px; font-weight: 600; z-index: 60; display: none; box-shadow: 0 4px 12px rgba(0,0,0,0.2); text-align: center; max-width: 90%; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🚚 RotaFácil V4</h1>
+    <div class="header-actions">
+      <button class="btn-header" onclick="limparTodaRota()">Limpar Rota</button>
+      <button class="btn-header" onclick="resetarExemplo()">Demo</button>
+    </div>
+  </header>
+
+  <!-- Barra de KPIs -->
+  <div class="kpi-bar">
+    <div class="kpi-grid">
+      <div><div class="kpi-val" id="kpiTotal" style="color:var(--primary)">0</div><div class="kpi-lbl">Total</div></div>
+      <div><div class="kpi-val" id="kpiFeitas" style="color:var(--success)">0</div><div class="kpi-lbl">Feitas</div></div>
+      <div><div class="kpi-val" id="kpiRestantes" style="color:var(--warning)">0</div><div class="kpi-lbl">Restantes</div></div>
+      <div><div class="kpi-val" id="kpiProblemas" style="color:var(--danger)">0</div><div class="kpi-lbl">Problemas</div></div>
+    </div>
+    <div class="kpi-sub">
+      <span id="kpiPrevisao">Previsão de término: --:--</span>
+      <span id="kpiPercent" style="color:var(--success)">0% concluído</span>
+    </div>
+  </div>
+
+  <!-- TELA 1: MODO MOTORISTA -->
+  <div id="viewMotorista" class="view active">
+    <div id="proximaEntregaContainer"></div>
+
+    <input type="file" id="inputFotoComprovante" accept="image/*" capture="environment" style="display:none;" onchange="aoTirarFotoComprovante(event)" />
+
+    <div class="section-header">
+      <span class="section-title">Sequência da Rota</span>
+      <span style="font-size:11px; color:var(--muted);">Toque em 🗑️ para apagar</span>
+    </div>
+    <div id="listaEntregas"></div>
+  </div>
+
+  <!-- TELA 2: SCANNER OCR & CADASTRO -->
+  <div id="viewScanner" class="view">
+    <div class="scanner-card">
+      <div class="status-banner" id="scanStatus">
+        Tire uma foto da etiqueta com CEP ou ative a câmera ao vivo
+      </div>
+
+      <img id="fotoEtiquetaPreview" class="preview-img" alt="Etiqueta capturada" />
+
+      <div class="camera-box" id="cameraBox">
+        <video id="cameraVideo" autoplay playsinline muted></video>
+        <div class="scan-frame"></div>
+      </div>
+
+      <input type="file" id="inputFotoEtiqueta" accept="image/*" capture="environment" style="display:none;" onchange="aoSelecionarFotoEtiqueta(event)" />
+
+      <button class="btn btn-maps" style="width:100%; font-size:15px; margin-bottom:8px;" onclick="document.getElementById('inputFotoEtiqueta').click()">
+        📷 TIRAR FOTO DA ETIQUETA (OCR)
+      </button>
+
+      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:8px;">
+        <button class="btn btn-skip" id="btnToggleVideo" onclick="alternarCameraAoVivo()">
+          🎥 Câmera ao Vivo
+        </button>
+        <button class="btn btn-done" id="btnCapturarFrame" style="display:none; margin:0; padding:11px; font-size:12px;" onclick="capturarDoVideoAoVivo()">
+          ⚡ Ler Quadro Agora
+        </button>
+      </div>
+    </div>
+
+    <!-- Caixa de Confirmação após leitura da câmera -->
+    <div class="confirm-box" id="confirmBox">
+      <div class="confirm-title">✓ Endereço Lido — Confira antes de salvar:</div>
+      <div class="input-row">
+        <input type="text" id="confLogradouro" placeholder="Rua / Avenida" />
+        <input type="text" id="confNumero" placeholder="Número" />
+      </div>
+      <div class="input-row">
+        <input type="text" id="confBairro" placeholder="Bairro" />
+        <input type="text" id="confCidade" placeholder="Cidade - UF" />
+      </div>
+      <div class="input-row">
+        <input type="text" id="confCep" placeholder="CEP" />
+        <input type="text" id="confCliente" placeholder="Nome Destinatário" />
+      </div>
+      <div class="confirm-btns">
+        <button class="btn btn-done" style="margin:0; padding:12px; font-size:14px;" onclick="confirmarInclusaoOcr()">
+          ✅ SALVAR NA ROTA
+        </button>
+        <button class="btn btn-prob" style="margin:0; padding:12px; font-size:13px;" onclick="descartarLeituraOcr()">
+          ✖ DESCARTAR
+        </button>
+      </div>
+    </div>
+
+    <!-- Entrada Manual Rápida por CEP -->
+    <div class="manual-box">
+      <div style="font-weight:700; font-size:13px; margin-bottom:8px;">⌨️ Digitar CEP Manualmente</div>
+      <div class="input-row">
+        <input type="text" id="inCep" placeholder="CEP (ex: 09920-570)" maxlength="9" />
+        <input type="text" id="inNumero" placeholder="Número (ex: 381)" />
+      </div>
+      <div class="input-row">
+        <input type="text" id="inCliente" placeholder="Nome do Destinatário" />
+        <button class="btn btn-maps" style="padding:10px; margin:0; font-size:13px;" onclick="adicionarPorCepManual()">+ Buscar e Incluir</button>
+      </div>
+    </div>
+
+    <div class="section-header">
+      <span class="section-title">Pacotes na Rota (<span id="countBipados">0</span>)</span>
+      <button class="btn-clear-all" onclick="limparTodaRota()">🗑️ Apagar Todos</button>
+    </div>
+    <div id="listaBipados"></div>
+  </div>
+
+  <!-- Navegação Inferior -->
+  <div class="bottom-nav">
+    <button class="tab-btn active" id="tabMotorista" onclick="mudarAba('motorista')">🧭 Modo Motorista</button>
+    <button class="tab-btn" id="tabScanner" onclick="mudarAba('scanner')">📷 Bipar / Foto</button>
+  </div>
+
+  <!-- Modal de Ocorrências -->
+  <div class="modal-bg" id="modalOcorrencia" onclick="fecharModal(event)">
+    <div class="modal-sheet">
+      <h3>Registrar Ocorrência</h3>
+      <button class="occ-btn" onclick="registrarOcorrencia('CLIENTE AUSENTE')">CLIENTE AUSENTE</button>
+      <button class="occ-btn" onclick="registrarOcorrencia('ENDEREÇO INCORRETO')">ENDEREÇO INCORRETO</button>
+      <button class="occ-btn" onclick="registrarOcorrencia('ESTABELECIMENTO FECHADO')">ESTABELECIMENTO FECHADO</button>
+      <button class="occ-btn" onclick="registrarOcorrencia('RECUSOU RECEBIMENTO')">RECUSOU RECEBIMENTO</button>
+      <button class="occ-btn" style="background:#f1f5f9; color:#334155;" onclick="fecharModal()">Cancelar</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <canvas id="snapshotCanvas" style="display:none;"></canvas>
+
+  <script>
+    let motoristaPos = { lat: -23.6865, lng: -46.6234 };
+    let cameraStream = null;
+    let pacoteTemporarioOcr = null;
+
+    const DADOS_INICIAIS = [
+      {
+        id: "1", ordem: 1, codigo: "BR9812731", destinatario: "João Silva",
+        logradouro: "Av. Fábio Eduardo Ramos Esquivel", numero: "1200",
+        bairro: "Centro", cidade: "Diadema - SP", cep: "09920-570",
+        lat: -23.6865, lng: -46.6234, validado: true, status: "pendente", motivo: "", temFoto: false
+      },
+      {
+        id: "2", ordem: 2, codigo: "BR9812732", destinatario: "Maria Oliveira",
+        logradouro: "Rua Santo Alberto", numero: "381",
+        bairro: "Vila São Pedro", cidade: "São Paulo - SP", cep: "04676-000",
+        lat: -23.6682, lng: -46.6789, validado: true, status: "pendente", motivo: "", temFoto: false
+      },
+      {
+        id: "3", ordem: 3, codigo: "BR9812733", destinatario: "Mercado Central",
+        logradouro: "Av. Cupecê", numero: "2450",
+        bairro: "Jardim Prudência", cidade: "São Paulo - SP", cep: "04366-000",
+        lat: -23.6641, lng: -46.6632, validado: false, status: "pendente", motivo: "", temFoto: false
+      }
+    ];
+
+    let entregas = JSON.parse(localStorage.getItem("rotafacil_v4")) || JSON.parse(JSON.stringify(DADOS_INICIAIS));
+
+    function salvarDados() {
+      localStorage.setItem("rotafacil_v4", JSON.stringify(entregas));
+    }
+
+    function resetarExemplo() {
+      entregas = JSON.parse(JSON.stringify(DADOS_INICIAIS));
+      salvarDados();
+      renderizarTudo();
+      mostrarToast("Rota de demonstração restaurada!");
+    }
+
+    function limparTodaRota() {
+      if (entregas.length === 0) return;
+      if (!confirm("Deseja apagar TODOS os endereços da rota atual?")) return;
+      entregas = [];
+      salvarDados();
+      renderizarTudo();
+      mostrarToast("🗑️ Todos os endereços foram apagados.");
+    }
+
+    function excluirEntrega(id) {
+      const alvo = entregas.find(e => e.id === id);
+      if (!alvo) return;
+      if (!confirm(`Apagar este endereço?\n${alvo.logradouro}, ${alvo.numero}`)) return;
+
+      entregas = entregas.filter(e => e.id !== id);
+      reotimizarRota();
+      renderizarTudo();
+      mostrarToast(`🗑️ Removido: ${alvo.logradouro}, ${alvo.numero}`);
+    }
+
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        motoristaPos = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        renderizarTudo();
+      }, () => {});
+    }
+
+    function calcularKm(lat1, lon1, lat2, lon2) {
+      const p = 0.017453292519943295;
+      const a = 0.5 - Math.cos((lat2 - lat1) * p) / 2 +
+        Math.cos(lat1 * p) * Math.cos(lat2 * p) * (1 - Math.cos((lon2 - lon1) * p)) / 2;
+      return 12742 * Math.asin(Math.sqrt(a));
+    }
+
+    function reotimizarRota() {
+      const finalizadas = entregas.filter(e => e.status !== "pendente");
+      const pendentes = entregas.filter(e => e.status === "pendente");
+
+      const ordenadas = [];
+      let curLat = motoristaPos.lat;
+      let curLng = motoristaPos.lng;
+
+      while (pendentes.length > 0) {
+        pendentes.sort((a, b) => {
+          const dA = calcularKm(curLat, curLng, a.lat || curLat, a.lng || curLng);
+          const dB = calcularKm(curLat, curLng, b.lat || curLat, b.lng || curLng);
+          return dA - dB;
+        });
+        const prox = pendentes.shift();
+        ordenadas.push(prox);
+        if (prox.lat && prox.lng) {
+          curLat = prox.lat;
+          curLng = prox.lng;
+        }
+      }
+
+      entregas = [...finalizadas, ...ordenadas];
+      entregas.forEach((e, idx) => e.ordem = idx + 1);
+      salvarDados();
+    }
+
+    function getProxima() {
+      return entregas.find(e => e.status === "pendente");
+    }
+
+    function aoTirarFotoComprovante(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const atual = getProxima();
+      if (atual) {
+        atual.temFoto = true;
+        salvarDados();
+        renderizarTudo();
+        mostrarToast("📸 Foto do comprovante anexada!");
+      }
+      event.target.value = "";
+    }
+
+    function concluirEntrega() {
+      const atual = getProxima();
+      if (!atual) return;
+      atual.status = "concluida";
+      if (atual.lat && atual.lng) {
+        motoristaPos = { lat: atual.lat, lng: atual.lng };
+      }
+      salvarDados();
+      renderizarTudo();
+      mostrarToast("✓ Entrega concluída!");
+    }
+
+    function pularEReotimizar() {
+      const atual = getProxima();
+      if (!atual) return;
+      atual.status = "pulada";
+      atual.motivo = "Pulada pelo motorista";
+      reotimizarRota();
+      renderizarTudo();
+      const rest = entregas.filter(e => e.status === "pendente").length;
+      mostrarToast(`Entrega pulada! ${rest} restantes reotimizadas.`);
+    }
+
+    function abrirModalOcorrencia() {
+      document.getElementById("modalOcorrencia").classList.add("open");
+    }
+
+    function fecharModal(e) {
+      if (!e || e.target.id === "modalOcorrencia") {
+        document.getElementById("modalOcorrencia").classList.remove("open");
+      }
+    }
+
+    function registrarOcorrencia(motivo) {
+      const atual = getProxima();
+      if (!atual) return;
+      atual.status = "problema";
+      atual.motivo = motivo;
+      fecharModal();
+      reotimizarRota();
+      renderizarTudo();
+      mostrarToast(`Ocorrência: ${motivo}`);
+    }
+
+    // ========================================================================
+    // LEITURA DE ETIQUETA POR FOTO OU CÂMERA AO VIVO (OCR)
+    // ========================================================================
+    async function alternarCameraAoVivo() {
+      const box = document.getElementById("cameraBox");
+      const btnCap = document.getElementById("btnCapturarFrame");
+      const btnToggle = document.getElementById("btnToggleVideo");
+      const statusEl = document.getElementById("scanStatus");
+
+      if (cameraStream) {
+        pararCamera();
+        return;
+      }
+
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode: "environment" }
+        });
+        document.getElementById("cameraVideo").srcObject = cameraStream;
+        box.classList.add("active");
+        btnCap.style.display = "flex";
+        btnToggle.innerText = "⏹ Fechar Câmera";
+        statusEl.innerText = "Enquadre a etiqueta no quadro verde e toque em Ler Quadro";
+      } catch (err) {
+        statusEl.innerText = "⚠ Vídeo ao vivo bloqueado neste navegador. Use o botão azul 'TIRAR FOTO DA ETIQUETA' acima!";
+        mostrarToast("Use o botão azul Tirar Foto!");
+      }
+    }
+
+    function pararCamera() {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(t => t.stop());
+        cameraStream = null;
+      }
+      document.getElementById("cameraBox").classList.remove("active");
+      document.getElementById("btnCapturarFrame").style.display = "none";
+      document.getElementById("btnToggleVideo").innerText = "🎥 Câmera ao Vivo";
+    }
+
+    async function aoSelecionarFotoEtiqueta(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const preview = document.getElementById("fotoEtiquetaPreview");
+      preview.src = URL.createObjectURL(file);
+      preview.style.display = "block";
+
+      await processarImagemOcr(file);
+      event.target.value = "";
+    }
+
+    async function capturarDoVideoAoVivo() {
+      const video = document.getElementById("cameraVideo");
+      if (!video.videoWidth) return;
+
+      const canvas = document.getElementById("snapshotCanvas");
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      canvas.getContext("2d").drawImage(video, 0, 0);
+
+      await processarImagemOcr(canvas);
+    }
+
+    async function processarImagemOcr(fonteImagem) {
+      const statusEl = document.getElementById("scanStatus");
+      statusEl.innerText = "⏳ Lendo texto da etiqueta (OCR)... aguarde alguns segundos...";
+
+      try {
+        const { data: { text } } = await Tesseract.recognize(fonteImagem, "por");
+        const matchCep = text.match(/\b(\d{5})-?(\d{3})\b/);
+
+        if (!matchCep) {
+          statusEl.innerText = "⚠ Não encontrei um CEP na foto. Tente aproximar mais ou digitar o CEP abaixo.";
+          return;
+        }
+
+        const cepLimpo = `${matchCep[1]}${matchCep[2]}`;
+        const matchNum = text.match(/(?:rua|av|avenida|alameda|travessa|r\.|av\.)[^,\n]*?(?:n[º°.]?\s*|[,\s]+)(\d{1,5})\b/i);
+        const numero = matchNum ? matchNum[1] : "";
+
+        statusEl.innerText = `✓ CEP ${matchCep[1]}-${matchCep[2]} identificado! Buscando rua...`;
+
+        const dadosEnd = await consultarCepECoordenadas(cepLimpo, numero);
+        pacoteTemporarioOcr = dadosEnd;
+
+        document.getElementById("confLogradouro").value = dadosEnd.logradouro;
+        document.getElementById("confNumero").value = dadosEnd.numero;
+        document.getElementById("confBairro").value = dadosEnd.bairro;
+        document.getElementById("confCidade").value = dadosEnd.cidade;
+        document.getElementById("confCep").value = dadosEnd.cep;
+        document.getElementById("confCliente").value = "Cliente";
+        document.getElementById("confirmBox").classList.add("active");
+
+        statusEl.innerText = "Confira os dados na caixa verde abaixo e toque em Salvar!";
+      } catch (e) {
+        statusEl.innerText = "Erro ao ler imagem. Tente novamente com mais luz.";
+      }
+    }
+
+    function descartarLeituraOcr() {
+      pacoteTemporarioOcr = null;
+      document.getElementById("confirmBox").classList.remove("active");
+      document.getElementById("fotoEtiquetaPreview").style.display = "none";
+      document.getElementById("scanStatus").innerText = "Leitura descartada. Tire outra foto ou digite o CEP.";
+      mostrarToast("Leitura descartada.");
+    }
+
+    async function confirmarInclusaoOcr() {
+      const logradouro = document.getElementById("confLogradouro").value.trim();
+      const numero = document.getElementById("confNumero").value.trim() || "S/N";
+      const bairro = document.getElementById("confBairro").value.trim();
+      const cidade = document.getElementById("confCidade").value.trim();
+      const cep = document.getElementById("confCep").value.trim();
+      const destinatario = document.getElementById("confCliente").value.trim() || "Cliente";
+
+      if (!logradouro) {
+        mostrarToast("Preencha o nome da rua.");
+        return;
+      }
+
+      entregas.push({
+        id: Date.now().toString(),
+        ordem: entregas.length + 1,
+        codigo: "PKG-" + Math.floor(100000 + Math.random() * 900000),
+        destinatario,
+        logradouro,
+        numero,
+        bairro,
+        cidade,
+        cep,
+        lat: pacoteTemporarioOcr ? pacoteTemporarioOcr.lat : null,
+        lng: pacoteTemporarioOcr ? pacoteTemporarioOcr.lng : null,
+        validado: pacoteTemporarioOcr ? pacoteTemporarioOcr.validado : false,
+        status: "pendente",
+        motivo: "",
+        temFoto: false
+      });
+
+      pacoteTemporarioOcr = null;
+      document.getElementById("confirmBox").classList.remove("active");
+      document.getElementById("fotoEtiquetaPreview").style.display = "none";
+      document.getElementById("scanStatus").innerText = "✓ Pacote salvo! Pronto para escanear o próximo.";
+      reotimizarRota();
+      renderizarTudo();
+      mostrarToast(`✓ Adicionado: ${logradouro}, ${numero}`);
+    }
+
+    async function adicionarPorCepManual() {
+      const cepInput = document.getElementById("inCep").value.replace(/\D/g, "");
+      const numInput = document.getElementById("inNumero").value.trim() || "S/N";
+      const cliInput = document.getElementById("inCliente").value.trim() || "Cliente";
+
+      if (cepInput.length !== 8) {
+        mostrarToast("Digite um CEP válido com 8 números.");
+        return;
+      }
+
+      mostrarToast("Validando CEP e coordenadas...");
+      const dadosEnd = await consultarCepECoordenadas(cepInput, numInput);
+
+      entregas.push({
+        id: Date.now().toString(),
+        ordem: entregas.length + 1,
+        codigo: "PKG-" + Math.floor(100000 + Math.random() * 900000),
+        destinatario: cliInput,
+        logradouro: dadosEnd.logradouro,
+        numero: dadosEnd.numero || numInput,
+        bairro: dadosEnd.bairro,
+        cidade: dadosEnd.cidade,
+        cep: dadosEnd.cep,
+        lat: dadosEnd.lat,
+        lng: dadosEnd.lng,
+        validado: dadosEnd.validado,
+        status: "pendente",
+        motivo: "",
+        temFoto: false
+      });
+
+      document.getElementById("inCep").value = "";
+      document.getElementById("inNumero").value = "";
+      document.getElementById("inCliente").value = "";
+      reotimizarRota();
+      renderizarTudo();
+      mostrarToast(`✓ Adicionado: ${dadosEnd.logradouro}, ${numInput}`);
+    }
+
+    async function consultarCepECoordenadas(cepLimpo, numero) {
+      let logradouro = `Logradouro CEP ${cepLimpo}`;
+      let bairro = "";
+      let cidade = "";
+      let lat = null;
+      let lng = null;
+      let validado = false;
+
+      try {
+        const resCep = await fetch(`https://brasilapi.com.br/api/cep/v2/${cepLimpo}`);
+        if (resCep.ok) {
+          const data = await resCep.json();
+          logradouro = data.street || logradouro;
+          bairro = data.neighborhood || "";
+          cidade = `${data.city || ""} - ${data.state || ""}`;
+
+          const q = encodeURIComponent(`${logradouro}, ${numero}, ${cidade}, Brasil`);
+          const resGeo = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`);
+          if (resGeo.ok) {
+            const geoList = await resGeo.json();
+            if (geoList.length > 0) {
+              lat = parseFloat(geoList[0].lat);
+              lng = parseFloat(geoList[0].lon);
+              validado = (geoList[0].type === "house" || (numero && numero !== "S/N"));
+            }
+          }
+        }
+      } catch (_) {}
+
+      return {
+        logradouro,
+        numero,
+        bairro,
+        cidade,
+        cep: `${cepLimpo.slice(0,5)}-${cepLimpo.slice(5)}`,
+        lat,
+        lng,
+        validado
+      };
+    }
+
+    // ========================================================================
+    // NAVEGAÇÃO E RENDERIZAÇÃO
+    // ========================================================================
+    function mudarAba(aba) {
+      document.getElementById("viewMotorista").classList.toggle("active", aba === "motorista");
+      document.getElementById("viewScanner").classList.toggle("active", aba === "scanner");
+      document.getElementById("tabMotorista").classList.toggle("active", aba === "motorista");
+      document.getElementById("tabScanner").classList.toggle("active", aba === "scanner");
+      if (aba !== "scanner") pararCamera();
+    }
+
+    function renderizarTudo() {
+      const total = entregas.length;
+      const feitas = entregas.filter(e => e.status === "concluida").length;
+      const pendentes = entregas.filter(e => e.status === "pendente").length;
+      const problemas = entregas.filter(e => e.status === "problema" || e.status === "pulada").length;
+
+      document.getElementById("kpiTotal").innerText = total;
+      document.getElementById("kpiFeitas").innerText = feitas;
+      document.getElementById("kpiRestantes").innerText = pendentes;
+      document.getElementById("kpiProblemas").innerText = problemas;
+      document.getElementById("countBipados").innerText = total;
+
+      const pct = total === 0 ? 0 : Math.round((feitas / total) * 100);
+      document.getElementById("kpiPercent").innerText = `${pct}% concluído`;
+
+      const fim = new Date(Date.now() + pendentes * 4 * 60000);
+      const hh = String(fim.getHours()).padStart(2, "0");
+      const mm = String(fim.getMinutes()).padStart(2, "0");
+      document.getElementById("kpiPrevisao").innerText = `Previsão de término: ${hh}:${mm}`;
+
+      const prox = getProxima();
+      const container = document.getElementById("proximaEntregaContainer");
+
+      if (prox) {
+        const dist = (prox.lat && prox.lng)
+          ? calcularKm(motoristaPos.lat, motoristaPos.lng, prox.lat, prox.lng)
+          : 1.5;
+        const min = Math.round(dist * 2.5 + 2);
+
+        const wazeUrl = (prox.lat && prox.lng)
+          ? `https://waze.com/ul?ll=${prox.lat},${prox.lng}&navigate=yes`
+          : `https://waze.com/ul?q=${encodeURIComponent(prox.logradouro + ", " + prox.numero + " - " + prox.cidade)}&navigate=yes`;
+
+        const mapsUrl = (prox.lat && prox.lng)
+          ? `https://www.google.com/maps/dir/?api=1&destination=${prox.lat},${prox.lng}&travelmode=driving`
+          : `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(prox.logradouro + ", " + prox.numero + " - " + prox.cidade)}&travelmode=driving`;
+
+        container.innerHTML = `
+          <div class="next-card">
+            <div class="badge-row">
+              <span class="badge-stop">PRÓXIMA #${prox.ordem} • ${prox.codigo}</span>
+              <span class="dist-info">📏 ${dist.toFixed(1)} km • ⏱ ${min} min</span>
+            </div>
+            <div class="client-name">👤 ${prox.destinatario}</div>
+            <div class="address-main">${prox.logradouro}, ${prox.numero}</div>
+            <div class="address-sub">${prox.bairro} • ${prox.cidade} • CEP ${prox.cep}</div>
+            ${!prox.validado ? `<div class="alert-geo">⚠ Endereço aproximado — confirmar numeração no local</div>` : ""}
+
+            <div class="nav-grid">
+              <a href="${wazeUrl}" target="_blank" class="btn btn-waze">🧭 WAZE</a>
+              <a href="${mapsUrl}" target="_blank" class="btn btn-maps">🗺️ MAPS</a>
+            </div>
+
+            <button class="btn btn-photo" onclick="document.getElementById('inputFotoComprovante').click()">
+              ${prox.temFoto ? "📸 FOTO ANEXADA ✓ (TIRAR OUTRA)" : "📸 TIRAR FOTO DO COMPROVANTE"}
+            </button>
+
+            <button class="btn btn-done" onclick="concluirEntrega()">✅ ENTREGA REALIZADA</button>
+
+            <div class="sec-grid">
+              <button class="btn btn-skip" onclick="pularEReotimizar()">⏭ PULAR E RECALCULAR</button>
+              <button class="btn btn-prob" onclick="abrirModalOcorrencia()">⚠️ PROBLEMA</button>
+            </div>
+          </div>
+        `;
+      } else if (total > 0) {
+        container.innerHTML = `
+          <div class="next-card" style="text-align:center; border-left-color:var(--success);">
+            <div style="font-size:42px;">🏆</div>
+            <h2 style="margin:8px 0;">Rota Finalizada!</h2>
+            <p style="color:var(--muted); font-size:14px;">${feitas} entregues • ${problemas} ocorrências/puladas</p>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div class="next-card" style="text-align:center; border-left-color:var(--primary);">
+            <div style="font-size:38px;">📦</div>
+            <h3 style="margin:8px 0;">Nenhum pacote na rota</h3>
+            <p style="color:var(--muted); font-size:13px; margin-bottom:12px;">Toque em "Bipar / Foto" abaixo para escanear as etiquetas dos pacotes.</p>
+            <button class="btn btn-maps" style="width:100%;" onclick="mudarAba('scanner')">📷 IR PARA SCANNER DE PACOTES</button>
+          </div>
+        `;
+      }
+
+      const htmlLista = entregas.length === 0
+        ? `<div style="text-align:center; color:var(--muted); font-size:13px; padding:16px;">Lista vazia</div>`
+        : entregas.map(e => {
+            const iconStatus = e.status === "concluida" ? (e.temFoto ? "✅📸" : "✅") : (e.status === "pendente" ? "🟡" : "🔴");
+            const iconGeo = e.validado ? "✓ Localizado" : "⚠ Verificar nº";
+            return `
+              <div class="stop-item st-${e.status}">
+                <div class="stop-num">${e.ordem}</div>
+                <div class="stop-info">
+                  <div class="stop-addr">${e.logradouro}, ${e.numero}</div>
+                  <div class="stop-meta">${e.motivo ? e.motivo : `${e.destinatario} • ${e.bairro} • ${iconGeo}`}</div>
+                </div>
+                <div class="stop-actions">
+                  <span>${iconStatus}</span>
+                  <button class="btn-del" title="Apagar endereço" onclick="excluirEntrega('${e.id}')">🗑️</button>
+                </div>
+              </div>
+            `;
+          }).join("");
+
+      document.getElementById("listaEntregas").innerHTML = htmlLista;
+      document.getElementById("listaBipados").innerHTML = htmlLista;
+    }
+
+    function mostrarToast(msg) {
+      const t = document.getElementById("toast");
+      t.innerText = msg;
+      t.style.display = "block";
+      setTimeout(() => { t.style.display = "none"; }, 3000);
+    }
+
+    renderizarTudo();
+  </script>
+</body>
+</html>
